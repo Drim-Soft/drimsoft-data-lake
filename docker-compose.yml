@@ -1,0 +1,64 @@
+version: "3.9"
+
+services:
+  # 🪣 Almacenamiento (Data Lake)
+  minio:
+    image: quay.io/minio/minio
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Consola Web
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    volumes:
+      - ./minio_data:/data
+
+  # ⚙️ Ingesta (ETL visual)
+  nifi:
+    image: apache/nifi:latest
+    container_name: nifi
+    ports:
+      - "8080:8080"
+    environment:
+      NIFI_WEB_HTTP_PORT: 8080
+    volumes:
+      - ./nifi_data:/opt/nifi/nifi-current/logs
+
+  # 🧮 Motor SQL sobre Data Lake
+  trino:
+    image: trinodb/trino
+    container_name: trino
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./trino-config:/etc/trino
+    depends_on:
+      - minio
+
+  # 🗄️ Base de datos para Superset
+  postgres:
+    image: postgres:15
+    container_name: superset_db
+    environment:
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+      POSTGRES_DB: superset
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data
+
+  # 📊 Visualización y BI
+  superset:
+    image: apache/superset
+    container_name: superset
+    environment:
+      - SUPERSET_LOAD_EXAMPLES=no
+      - SUPERSET_SECRET_KEY=secret_key_123
+      - SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://superset:superset@postgres:5432/superset
+    ports:
+      - "8088:8088"
+    depends_on:
+      - postgres
+    volumes:
+      - ./superset_home:/app/superset_home
