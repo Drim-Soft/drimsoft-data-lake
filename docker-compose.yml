@@ -1,162 +1,112 @@
 services:
-  # 🪣 Almacenamiento (Data Lake)
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: minio
-    command: server /data --console-address ":9001"
+  # 🧭 Prefect - Orquestador ETL
+  prefect:
+    image: prefecthq/prefect:2.19.4-python3.10
+    container_name: prefect
+    restart: always
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Consola Web
+      - "4200:4200"
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: admin123
-    volumes:
-      - ./minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
+      PREFECT_SERVER_API_HOST: "0.0.0.0"
+      PREFECT_API_URL: "http://0.0.0.0:4200/api"
+    command: prefect server start --host 0.0.0.0
+    networks:
+      - datalake
 
-  # ⚙️ Ingesta (ETL visual)
-  nifi:
-    image: apache/nifi:1.25.0
-    container_name: nifi
-    hostname: nifi
-    ports:
-      - "8080:8080"   # HTTP
-      - "8443:8443"   # HTTPS
-    environment:
-      # Configuración de red
-      NIFI_WEB_HTTP_PORT: '8080'
-      NIFI_WEB_HTTP_HOST: '0.0.0.0'
-      NIFI_WEB_HTTPS_PORT: ''  # Deshabilitar HTTPS
-      
-      # 🔐 Credenciales personalizadas
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: admin123
-      
-      # Optimización de memoria
-      NIFI_JVM_HEAP_INIT: 512m
-      NIFI_JVM_HEAP_MAX: 1g
-    volumes:
-      - nifi_database_repository:/opt/nifi/nifi-current/database_repository
-      - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
-      - nifi_content_repository:/opt/nifi/nifi-current/content_repository
-      - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
-      - nifi_state:/opt/nifi/nifi-current/state
-      - nifi_logs:/opt/nifi/nifi-current/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/nifi"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 300s
-    restart: unless-stopped
-    depends_on:
-      - minio
-
-  # 🧮 Motor SQL sobre Data Lake
-  trino:
-    image: trinodb/trino:latest
-    container_name: trino
-    ports:
-      - "8081:8080"
-    environment:
-      # Sin autenticación por defecto, se puede configurar
-      TRINO_ENVIRONMENT: production
-    volumes:
-      - ./trino-config:/etc/trino
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
-    depends_on:
-      - minio
-
-  # 🗄️ Base de datos para Superset
-  postgres:
+  # 🗄️ PostgreSQL - Data Warehouse
+  warehouse:
     image: postgres:15
-    container_name: superset_db
+    container_name: warehouse
+    restart: always
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
-      # 🔐 Credenciales de PostgreSQL
-      POSTGRES_USER: superset
-      POSTGRES_PASSWORD: superset123
-      POSTGRES_DB: superset
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: warehouse123
     volumes:
-      - ./pg_data:/var/lib/postgresql/data
+      - warehouse_data:/var/lib/postgresql/data
+    networks:
+      - datalake
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U superset"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U warehouse"]
+      interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
-  # 📊 Visualización y BI
+  # 🗄️ PostgreSQL - Base de datos de Superset
+  superset-db:
+    image: postgres:15
+    container_name: superset-db
+    restart: always
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+    volumes:
+      - superset_db:/var/lib/postgresql/data
+    networks:
+      - datalake
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 🔴 Redis - Caché de Superset
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    networks:
+      - datalake
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 📊 Superset - Dashboards
   superset:
     image: apache/superset:latest
     container_name: superset
-    ports:
-      - "8088:8088"
+    restart: always
     environment:
-      # 🔐 Credenciales de Superset
-      SUPERSET_SECRET_KEY: 'drimsoft'
-      
-      # Conexión a PostgreSQL
+      SUPERSET_SECRET_KEY: supersecretkey123456789abcdefgh
       DATABASE_DIALECT: postgresql
       DATABASE_USER: superset
-      DATABASE_PASSWORD: superset123
-      DATABASE_HOST: postgres
+      DATABASE_PASSWORD: superset
+      DATABASE_HOST: superset-db
       DATABASE_PORT: 5432
       DATABASE_DB: superset
-      
-      # No cargar ejemplos
-      SUPERSET_LOAD_EXAMPLES: 'no'
-    command: >
-      bash -c "
-      superset db upgrade &&
-      superset fab create-admin 
-        --username admin 
-        --firstname Admin 
-        --lastname User 
-        --email admin@drimsoft.com 
-        --password admin123456 &&
-      superset init &&
-      gunicorn 
-        --bind 0.0.0.0:8088 
-        --access-logfile - 
-        --error-logfile - 
-        --workers 4 
-        --worker-class gthread 
-        --threads 20 
-        --timeout 200 
-        --limit-request-line 0 
-        --limit-request-field_size 0 
-        'superset.app:create_app()'
-      "
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
-    restart: unless-stopped
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8088:8088"
     depends_on:
-      postgres:
+      superset-db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
-      - ./superset_home:/app/superset_home
+      - superset_home:/app/superset_home
+    networks:
+      - datalake
+    command:
+      - /bin/bash
+      - -c
+      - |
+        pip install psycopg2-binary redis
+        superset db upgrade
+        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@example.com --password admin123 || true
+        superset init
+        gunicorn --bind 0.0.0.0:8088 --workers 4 --timeout 120 --limit-request-line 0 --limit-request-field_size 0 'superset.app:create_app()'
 
 volumes:
-  nifi_database_repository:
-  nifi_flowfile_repository:
-  nifi_content_repository:
-  nifi_provenance_repository:
-  nifi_state:
-  nifi_logs:
+  warehouse_data:
+  superset_db:
+  superset_home:
+
+networks:
+  datalake:
+    driver: bridge
