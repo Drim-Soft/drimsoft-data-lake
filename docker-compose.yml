@@ -66,9 +66,9 @@ services:
       timeout: 3s
       retries: 5
 
-  # 📊 Superset - Dashboards
+  # 📊 Superset - Dashboards (con build personalizado)
   superset:
-    image: apache/superset:latest
+    build: .
     container_name: superset
     restart: always
     environment:
@@ -96,7 +96,6 @@ services:
       - /bin/bash
       - -c
       - |
-        pip install psycopg2-binary redis
         superset db upgrade
         superset fab create-admin --username admin --firstname Admin --lastname User --email admin@example.com --password admin123 || true
         superset init
