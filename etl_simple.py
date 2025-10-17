@@ -2,6 +2,7 @@
 ETL Simple: Genera datos de ventas y los carga en PostgreSQL
 Solo requiere: pip install psycopg2-binary
 Ejecutar: python etl_simple.py
+esta se sopla 
 """
 
 import psycopg2
