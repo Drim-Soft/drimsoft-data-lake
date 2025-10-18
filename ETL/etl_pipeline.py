@@ -7,7 +7,7 @@ import os, sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "models")))
 
-# Importaciones de los modelos ahora correctas 👇
+# Importaciones de los modelos ahora correctas 
 from models.suscripciones_models import Invoice
 from models.proyectos_models import Project
 from models.planifika_models import UserPlanifika

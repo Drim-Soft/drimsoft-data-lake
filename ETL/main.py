@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base  # ahora sí existe unificado 💪
+from models import Base  # ahora sí existe unificado 
 
 # URIs
 DB_URI_SUSCRIPCIONES = "postgresql://postgres:[YOUR-PASSWORD]@db.iwnxlkmjvxmcuscangyi.supabase.co:5432/postgres"
