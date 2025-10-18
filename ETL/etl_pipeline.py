@@ -1,10 +1,17 @@
-# etl_pipeline.py
 from prefect import flow, task
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from suscripciones_models import Invoice
-from proyectos_models import Project
-from planifika_models import UserPlanifika
+import os, sys
+
+# Agregar el path del proyecto y el de la carpeta models
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "models")))
+
+# Importaciones de los modelos ahora correctas 👇
+from models.suscripciones_models import Invoice
+from models.proyectos_models import Project
+from models.planifika_models import UserPlanifika
+from models import Base
 from main import engine_suscripciones, engine_proyectos, engine_planifika, engine_drimsoft
 
 #  Conexión al warehouse

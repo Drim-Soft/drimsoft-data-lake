@@ -1,8 +1,5 @@
-# suscripciones_models.py
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-
-Base = declarative_base()
+from sqlalchemy import Column, Integer, String, ForeignKey
+from . import Base
 
 class Subscription(Base):
     __tablename__ = 'subscription'
@@ -21,6 +18,6 @@ class PaymentMethod(Base):
 
 class Invoice(Base):
     __tablename__ = 'invoice'
-    idinvoice = Column(Integer, primary_key=True, autoincrement=True) 
+    idinvoice = Column(Integer, primary_key=True, autoincrement=True)
     idsubscription = Column(Integer, ForeignKey('subscription.idsubscription'))
     idsubscriptionstatus = Column(Integer, ForeignKey('subscriptionstatus.idsubscriptionstatus'))

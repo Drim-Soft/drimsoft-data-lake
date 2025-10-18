@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base  # si compartes modelos o puedes separar por archivo
+from models import Base  # ahora sí existe unificado 💪
 
-# 👇 URIs — tú las llenas
+# URIs
 DB_URI_SUSCRIPCIONES = "postgresql://postgres:[YOUR-PASSWORD]@db.iwnxlkmjvxmcuscangyi.supabase.co:5432/postgres"
 DB_URI_PLANIFIKA = "postgresql://postgres:[YOUR-PASSWORD]@db.znzlfnztvnnzfbbsdjsl.supabase.co:5432/postgres"
 DB_URI_DRIMSOFT = "postgresql://postgres:[YOUR-PASSWORD]@db.zqbwjlrlnxjlrusmmciw.supabase.co:5432/postgres"
@@ -20,36 +20,8 @@ SessionPlanifika = sessionmaker(bind=engine_planifika)
 SessionDrimsoft = sessionmaker(bind=engine_drimsoft)
 SessionProyectos = sessionmaker(bind=engine_proyectos)
 
-# Crear tablas si aplica
+# Crear todas las tablas (si no existen)
 Base.metadata.create_all(bind=engine_suscripciones)
 Base.metadata.create_all(bind=engine_planifika)
 Base.metadata.create_all(bind=engine_drimsoft)
 Base.metadata.create_all(bind=engine_proyectos)
-
-def get_db_suscripciones():
-    db = SessionSuscripciones()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def get_db_planifika():
-    db = SessionPlanifika()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def get_db_drimsoft():
-    db = SessionDrimsoft()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def get_db_proyectos():
-    db = SessionProyectos()
-    try:
-        yield db
-    finally:
-        db.close()
