@@ -1,0 +1,12 @@
+# Archivos sensibles
+.env
+
+# Entornos virtuales
+venv/
+__pycache__/
+
+# Archivos de logs o temporales
+*.log
+*.pyc
+*.pyo
+*.tmp
