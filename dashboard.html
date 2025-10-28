@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drimsoft Analytics Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        h1 {
+            color: #1f2937;
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .dashboard-container {
+            flex: 1;
+            margin: 1.5rem 2rem;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-height: 600px;
+        }
+
+        .success-message {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 2rem;
+            color: #155724;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #my-superset-container {
+            width: 100%;
+            flex: 1;
+            position: relative;
+        }
+
+        #my-superset-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .loading-overlay.hidden {
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer p {
+            color: #4b5563;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-online {
+            background: #10b981;
+        }
+
+        .status-error {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.3rem;
+            }
+            
+            .dashboard-container {
+                margin: 1rem;
+                min-height: 500px;
+            }
+
+            .footer {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1>
+                <span>📊</span>
+                Drimsoft Analytics Dashboard
+            </h1>
+            <div class="controls">
+                <button class="btn btn-success" id="refreshBtn" onclick="refreshDashboard()">
+                    <span>🔄</span>
+                    <span>Actualizar Dashboard</span>
+                </button>
+                <button class="btn btn-secondary" onclick="reloadDashboard()">
+                    <span>↻</span>
+                    <span>Recargar</span>
+                </button>
+                <button class="btn btn-primary" onclick="openInNewTab()">
+                    <span>🔗</span>
+                    <span>Abrir en Superset</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Success Message -->
+    <div id="successMessage" class="success-message">
+        ✅ Dashboard actualizado correctamente
+    </div>
+
+    <!-- Dashboard Container -->
+    <main class="dashboard-container">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p>Cargando dashboard...</p>
+            <p style="margin-top: 1rem; color: #6b7280; font-size: 0.9rem;">
+                Configurando acceso público sin autenticación
+            </p>
+        </div>
+        
+        <!-- Contenedor del dashboard -->
+        <div id="my-superset-container"></div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="status">
+            <span class="status-indicator status-online" id="statusIndicator"></span>
+            <span id="statusText">Conectado</span>
+        </div>
+        <p>
+            Última actualización: <span id="lastUpdate">Cargando...</span>
+        </p>
+    </footer>
+
+    <!-- Superset Embedded SDK -->
+    <script src="https://unpkg.com/@superset-ui/embedded-sdk"></script>
+
+    <script>
+        // ⚙️ CONFIGURACIÓN
+        const CONFIG = {
+            DASHBOARD_ID: '7a1067c2-43db-4874-b94a-6e97889fb622',
+            SUPERSET_URL: 'http://localhost:8088',
+            API_URL: 'http://localhost:5000',
+            GUEST_TOKEN_API_URL: 'http://localhost:5001',
+        };
+
+        let embeddedDashboard = null;
+
+        // 🚀 Inicializar
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Iniciando Superset Embedded Dashboard (Guest Token)...');
+            console.log('📍 Dashboard ID:', CONFIG.DASHBOARD_ID);
+            
+            // Cargar dashboard
+            loadEmbeddedDashboard();
+            
+            // Actualizar timestamp
+            updateLastUpdateTime();
+            setInterval(updateLastUpdateTime, 60000);
+        });
+
+        // 🔑 Obtener Guest Token
+        async function fetchGuestToken() {
+            try {
+                console.log('🔑 Solicitando guest token...');
+                
+                const response = await fetch(`${CONFIG.GUEST_TOKEN_API_URL}/api/guest-token`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('✅ Token recibido:', data.token.substring(0, 50) + '...');
+                console.log('📅 Expira:', data.expires_at);
+                
+                return data.token;
+                
+            } catch (error) {
+                console.error('❌ Error obteniendo token:', error);
+                setStatus('Error de autenticación', 'error');
+                throw error;
+            }
+        }
+
+        // 📊 Cargar Dashboard Embebido
+        async function loadEmbeddedDashboard() {
+            try {
+                console.log('📊 Cargando dashboard embebido...');
+                
+                // Limpiar contenedor
+                const container = document.getElementById('my-superset-container');
+                container.innerHTML = '';
+                
+                // Embed dashboard usando el SDK con guest token
+                embeddedDashboard = await supersetEmbeddedSdk.embedDashboard({
+                    id: CONFIG.DASHBOARD_ID,
+                    supersetDomain: CONFIG.SUPERSET_URL,
+                    mountPoint: container,
+                    fetchGuestToken: fetchGuestToken,
+                    dashboardUiConfig: {
+                        hideTitle: false,
+                        hideTab: false,
+                        hideChartControls: false,
+                        filters: {
+                            expanded: false,
+                        }
+                    }
+                });
+                
+                console.log('✅ Dashboard embebido correctamente');
+                setStatus('Dashboard cargado', 'online');
+                
+                // Ocultar loading
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }, 1500);
+                
+            } catch (error) {
+                console.error('❌ Error al cargar dashboard:', error);
+                setStatus('Error de conexión', 'error');
+                
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <p style="color: #dc2626; font-size: 1.2rem; margin-bottom: 1rem;">
+                            ⚠️ Error al cargar el dashboard
+                        </p>
+                        <p style="color: #6b7280; margin-bottom: 1rem;">
+                            ${error.message || 'Error desconocido'}
+                        </p>
+                        <button onclick="reloadDashboard()" class="btn btn-secondary">
+                            ↻ Reintentar
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // ↻ Recargar Dashboard
+        function reloadDashboard() {
+            console.log('↻ Recargando dashboard...');
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            setStatus('Recargando...', 'online');
+            loadEmbeddedDashboard();
+            updateLastUpdateTime();
+        }
+
+        // 🔄 Actualizar Dashboard (ejecutar ETL)
+        async function refreshDashboard() {
+            const btn = document.getElementById('refreshBtn');
+            const originalText = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span><span>Ejecutando ETL...</span>';
+            
+            try {
+                console.log('🔄 Iniciando ETL...');
+                
+                const response = await fetch(`${CONFIG.API_URL}/api/etl/trigger`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Error al ejecutar ETL');
+                }
+                
+                // Esperar a que termine el ETL
+                await pollETLStatus(btn);
+                
+                // Recargar dashboard
+                reloadDashboard();
+                showSuccessMessage();
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert('⚠️ Error al actualizar dashboard.\n\n' +
+                      'Verifica que api_etl.py esté corriendo:\n' +
+                      'python api_etl.py\n\n' +
+                      'Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        // 📡 Polling del estado del ETL
+        async function pollETLStatus(btn) {
+            const maxAttempts = 60;
+            let attempts = 0;
+            
+            while (attempts < maxAttempts) {
+                try {
+                    const response = await fetch(`${CONFIG.API_URL}/api/etl/status`);
+                    const status = await response.json();
+                    
+                    if (!status.running) {
+                        if (status.last_error) {
+                            throw new Error(status.last_error);
+                        }
+                        return;
+                    }
+                    
+                    btn.innerHTML = `<span>⏳</span><span>ETL... ${status.progress}%</span>`;
+                    
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    attempts++;
+                } catch (error) {
+                    console.error('Error checking ETL:', error);
+                    break;
+                }
+            }
+        }
+
+        // 🔗 Abrir en nueva pestaña
+        function openInNewTab() {
+            const url = `${CONFIG.SUPERSET_URL}/superset/dashboard/${CONFIG.DASHBOARD_ID}/`;
+            console.log('🔗 Abriendo:', url);
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
+        // ⏰ Actualizar timestamp
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('es-CO', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('lastUpdate').textContent = timeString;
+        }
+
+        // ✅ Mostrar mensaje de éxito
+        function showSuccessMessage() {
+            const msg = document.getElementById('successMessage');
+            msg.classList.add('show');
+            setTimeout(() => {
+                msg.classList.remove('show');
+            }, 3000);
+        }
+
+        // 🚦 Actualizar estado visual
+        function setStatus(text, type) {
+            document.getElementById('statusText').textContent = text;
+            const indicator = document.getElementById('statusIndicator');
+            indicator.className = 'status-indicator';
+            indicator.classList.add(`status-${type}`);
+        }
+    </script>
+</body>
+</html>

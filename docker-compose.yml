@@ -45,6 +45,7 @@ services:
       POSTGRES_DB: superset
       POSTGRES_USER: superset
       POSTGRES_PASSWORD: superset
+      
     volumes:
       - superset_db:/var/lib/postgresql/data
     networks:
@@ -83,6 +84,8 @@ services:
       DATABASE_DB: superset
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TALISMAN_ENABLED: "False"
+      WTF_CSRF_ENABLED: "False"
     ports:
       - "8088:8088"
     depends_on:
@@ -92,6 +95,7 @@ services:
         condition: service_healthy
     volumes:
       - superset_home:/app/superset_home
+      - ./superset_config.py:/app/pythonpath/superset_config.py
     networks:
       - datalake
     command: >
@@ -113,6 +117,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_MASTER_PASSWORD: master123
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
