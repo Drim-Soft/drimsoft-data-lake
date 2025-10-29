@@ -31,15 +31,22 @@ from main import (
 # ============================================================
 # WAREHOUSE - LEER DESDE VARIABLES DE ENTORNO (DOCKER)
 # ============================================================
-WAREHOUSE_HOST = os.getenv('WAREHOUSE_HOST', 'localhost')
-WAREHOUSE_PORT = os.getenv('WAREHOUSE_PORT', '5433')
-WAREHOUSE_DB = os.getenv('WAREHOUSE_DB', 'warehouse')
-WAREHOUSE_USER = os.getenv('WAREHOUSE_USER', 'warehouse')
-WAREHOUSE_PASSWORD = os.getenv('WAREHOUSE_PASSWORD', 'warehouse123')
+# ============================================================
+# WAREHOUSE - LEER DESDE VARIABLES DE ENTORNO (DOCKER)
+# ============================================================
+import os
+from sqlalchemy import create_engine
+from urllib.parse import urlparse
 
-WAREHOUSE_URI = f"postgresql+psycopg2://{WAREHOUSE_USER}:{WAREHOUSE_PASSWORD}@{WAREHOUSE_HOST}:{WAREHOUSE_PORT}/{WAREHOUSE_DB}"
+WAREHOUSE_URI = os.getenv('WAREHOUSE_DB_URL')
 
-print(f"📊 Conectando a Warehouse: {WAREHOUSE_HOST}:{WAREHOUSE_PORT}/{WAREHOUSE_DB}")
+if not WAREHOUSE_URI:
+    raise ValueError("❌ No se encontró la variable de entorno WAREHOUSE_DB_URL")
+
+# Mostrar solo host y base, no credenciales
+parsed = urlparse(WAREHOUSE_URI)
+print(f"📊 Conectando a Warehouse: {parsed.hostname}:{parsed.port or '5432'}/{parsed.path.lstrip('/')}")
+
 engine_warehouse = create_engine(WAREHOUSE_URI)
 
 # ============================================================
