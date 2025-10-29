@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  # 🗄️ PostgreSQL - Data Warehouse
+  warehouse:
+    image: postgres:15
+    container_name: warehouse
+    restart: always
+    ports:
+      - "5433:5432"  # Solo para pgAdmin desde tu PC
+    environment:
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: warehouse123
+    volumes:
+      - warehouse_data:/var/lib/postgresql/data
+    networks:
+      - datalake
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 🔧 pgAdmin - Administración
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - datalake
+    depends_on:
+      warehouse:
+        condition: service_healthy
+
+  # 🔄 ETL - Extracción de datos (SE EJECUTA MANUAL)
+  etl:
+    build: ./etl
+    container_name: etl
+    environment:
+      # Warehouse (interno en Docker)
+      WAREHOUSE_HOST: warehouse
+      WAREHOUSE_PORT: 5432
+      WAREHOUSE_DB: warehouse
+      WAREHOUSE_USER: warehouse
+      WAREHOUSE_PASSWORD: warehouse123
+    networks:
+      - datalake
+    depends_on:
+      warehouse:
+        condition: service_healthy
+    profiles:
+      - etl  # Solo se ejecuta cuando lo llames explícitamente
+
+  # 📊 Dashboard - Aplicación Web
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: warehouse
+      DB_PORT: 5432  # Puerto INTERNO de Docker
+      DB_NAME: warehouse
+      DB_USER: warehouse
+      DB_PASSWORD: warehouse123
+    networks:
+      - datalake
+    depends_on:
+      warehouse:
+        condition: service_healthy
+
+volumes:
+  warehouse_data:
+  pgadmin_data:
+
+networks:
+  datalake:
+    driver: bridge
