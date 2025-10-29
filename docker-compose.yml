@@ -44,6 +44,8 @@ services:
   # 🔄 ETL - Extracción de datos (SE EJECUTA MANUAL)
   etl:
     build: ./etl
+    env_file:
+      - ./etl/.env
     container_name: etl
     environment:
       # Warehouse (interno en Docker)
