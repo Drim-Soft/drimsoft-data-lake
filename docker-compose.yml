@@ -7,7 +7,7 @@ services:
     container_name: warehouse
     restart: always
     ports:
-      - "5433:5432"  # Solo para pgAdmin desde tu PC
+      - "5433:5432"
     environment:
       POSTGRES_DB: warehouse
       POSTGRES_USER: warehouse
@@ -16,11 +16,78 @@ services:
       - warehouse_data:/var/lib/postgresql/data
     networks:
       - datalake
+      - drimsoft-network  # 🔥 Red compartida con frontend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U warehouse"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # 🐍 Flask API - Backend (puerto 5000)
+  flask-api:
+    build: ./dashboard
+    container_name: flask-api
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: warehouse
+      DB_PORT: 5432
+      DB_NAME: warehouse
+      DB_USER: warehouse
+      DB_PASSWORD: warehouse123
+    networks:
+      - datalake
+      - drimsoft-network  # 🔥 Red compartida con frontend
+    depends_on:
+      warehouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 🔄 ETL - Extracción de datos
+  etl:
+    build: ./etl
+    container_name: etl
+    env_file:
+      - .env
+    environment:
+      DB_HOST: warehouse
+      DB_PORT: 5432
+      DB_NAME: warehouse
+      DB_USER: warehouse
+      DB_PASSWORD: warehouse123
+    networks:
+      - datalake
+    depends_on:
+      warehouse:
+        condition: service_healthy
+    profiles:
+      - etl
+
+  # 📊 Dashboard - Aplicación Web (puerto 5005)
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard
+    restart: always
+    ports:
+      - "5005:5000"
+    environment:
+      DB_HOST: warehouse
+      DB_PORT: 5432
+      DB_NAME: warehouse
+      DB_USER: warehouse
+      DB_PASSWORD: warehouse123
+    networks:
+      - datalake
+    depends_on:
+      warehouse:
+        condition: service_healthy
+      flask-api:
+        condition: service_healthy
 
   # 🔧 pgAdmin - Administración
   pgadmin:
@@ -41,46 +108,6 @@ services:
       warehouse:
         condition: service_healthy
 
-  # 🔄 ETL - Extracción de datos (SE EJECUTA MANUAL)
-  etl:
-    build: ./etl
-    env_file:
-      - ./etl/.env
-    container_name: etl
-    environment:
-      # Warehouse (interno en Docker)
-      WAREHOUSE_HOST: warehouse
-      WAREHOUSE_PORT: 5432
-      WAREHOUSE_DB: warehouse
-      WAREHOUSE_USER: warehouse
-      WAREHOUSE_PASSWORD: warehouse123
-    networks:
-      - datalake
-    depends_on:
-      warehouse:
-        condition: service_healthy
-    profiles:
-      - etl  # Solo se ejecuta cuando lo llames explícitamente
-
-  # 📊 Dashboard - Aplicación Web
-  dashboard:
-    build: ./dashboard
-    container_name: dashboard
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      DB_HOST: warehouse
-      DB_PORT: 5432  # Puerto INTERNO de Docker
-      DB_NAME: warehouse
-      DB_USER: warehouse
-      DB_PASSWORD: warehouse123
-    networks:
-      - datalake
-    depends_on:
-      warehouse:
-        condition: service_healthy
-
 volumes:
   warehouse_data:
   pgadmin_data:
@@ -88,3 +115,8 @@ volumes:
 networks:
   datalake:
     driver: bridge
+  
+  # 🌐 Red externa compartida con el frontend
+  drimsoft-network:
+    external: true
+    name: drimsoft-network
