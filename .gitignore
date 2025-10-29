@@ -1,0 +1,44 @@
+# =========================================
+# Entornos virtuales y dependencias
+# =========================================
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================================
+# Archivos de configuración sensibles
+# =========================================
+.env
+.env.local
+*.env
+*.key
+*.pem
+
+# =========================================
+# Archivos de Docker y builds
+# =========================================
+*.log
+*.pid
+*.seed
+*.pid.lock
+*.db
+*.sqlite
+*.sqlite3
+*.DS_Store
+*.idea/
+*.vscode/
+*.bak
+*.swp
+*.tmp
+*~
+
+# =========================================
+# Archivos de salida o generados
+# =========================================
+dist/
+build/
+node_modules/
+dashboard/__pycache__/
+etl/__pycache__/

@@ -1,162 +1,122 @@
+version: "3.9"
+
 services:
-  # 🪣 Almacenamiento (Data Lake)
-  minio:
-    image: quay.io/minio/minio:latest
-    container_name: minio
-    command: server /data --console-address ":9001"
+  # 🗄️ PostgreSQL - Data Warehouse
+  warehouse:
+    image: postgres:15
+    container_name: warehouse
+    restart: always
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Consola Web
+      - "5433:5432"
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: admin123
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: warehouse123
     volumes:
-      - ./minio_data:/data
+      - warehouse_data:/var/lib/postgresql/data
+    networks:
+      - datalake
+      - drimsoft-network  # 🔥 Red compartida con frontend
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "pg_isready -U warehouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 🐍 Flask API - Backend (puerto 5000)
+  flask-api:
+    build: ./dashboard
+    container_name: flask-api
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: warehouse
+      DB_PORT: 5432
+      DB_NAME: warehouse
+      DB_USER: warehouse
+      DB_PASSWORD: warehouse123
+    networks:
+      - datalake
+      - drimsoft-network  # 🔥 Red compartida con frontend
+    depends_on:
+      warehouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
 
-  # ⚙️ Ingesta (ETL visual)
-  nifi:
-    image: apache/nifi:1.25.0
-    container_name: nifi
-    hostname: nifi
-    ports:
-      - "8080:8080"   # HTTP
-      - "8443:8443"   # HTTPS
+  # 🔄 ETL - Extracción de datos
+  etl:
+    build: ./etl
+    container_name: etl
+    env_file:
+      - .env
     environment:
-      # Configuración de red
-      NIFI_WEB_HTTP_PORT: '8080'
-      NIFI_WEB_HTTP_HOST: '0.0.0.0'
-      NIFI_WEB_HTTPS_PORT: ''  # Deshabilitar HTTPS
-      
-      # 🔐 Credenciales personalizadas
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: admin123
-      
-      # Optimización de memoria
-      NIFI_JVM_HEAP_INIT: 512m
-      NIFI_JVM_HEAP_MAX: 1g
-    volumes:
-      - nifi_database_repository:/opt/nifi/nifi-current/database_repository
-      - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
-      - nifi_content_repository:/opt/nifi/nifi-current/content_repository
-      - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
-      - nifi_state:/opt/nifi/nifi-current/state
-      - nifi_logs:/opt/nifi/nifi-current/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/nifi"]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 300s
-    restart: unless-stopped
+      DB_HOST: warehouse
+      DB_PORT: 5432
+      DB_NAME: warehouse
+      DB_USER: warehouse
+      DB_PASSWORD: warehouse123
+    networks:
+      - datalake
     depends_on:
-      - minio
-
-  # 🧮 Motor SQL sobre Data Lake
-  trino:
-    image: trinodb/trino:latest
-    container_name: trino
-    ports:
-      - "8081:8080"
-    environment:
-      # Sin autenticación por defecto, se puede configurar
-      TRINO_ENVIRONMENT: production
-    volumes:
-      - ./trino-config:/etc/trino
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    restart: unless-stopped
-    depends_on:
-      - minio
-
-  # 🗄️ Base de datos para Superset
-  postgres:
-    image: postgres:15
-    container_name: superset_db
-    ports:
-      - "5432:5432"
-    environment:
-      # 🔐 Credenciales de PostgreSQL
-      POSTGRES_USER: superset
-      POSTGRES_PASSWORD: superset123
-      POSTGRES_DB: superset
-    volumes:
-      - ./pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U superset"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # 📊 Visualización y BI
-  superset:
-    image: apache/superset:latest
-    container_name: superset
-    ports:
-      - "8088:8088"
-    environment:
-      # 🔐 Credenciales de Superset
-      SUPERSET_SECRET_KEY: 'drimsoft'
-      
-      # Conexión a PostgreSQL
-      DATABASE_DIALECT: postgresql
-      DATABASE_USER: superset
-      DATABASE_PASSWORD: superset123
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_DB: superset
-      
-      # No cargar ejemplos
-      SUPERSET_LOAD_EXAMPLES: 'no'
-    command: >
-      bash -c "
-      superset db upgrade &&
-      superset fab create-admin 
-        --username admin 
-        --firstname Admin 
-        --lastname User 
-        --email admin@drimsoft.com 
-        --password admin123456 &&
-      superset init &&
-      gunicorn 
-        --bind 0.0.0.0:8088 
-        --access-logfile - 
-        --error-logfile - 
-        --workers 4 
-        --worker-class gthread 
-        --threads 20 
-        --timeout 200 
-        --limit-request-line 0 
-        --limit-request-field_size 0 
-        'superset.app:create_app()'
-      "
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
-    restart: unless-stopped
-    depends_on:
-      postgres:
+      warehouse:
         condition: service_healthy
+    profiles:
+      - etl
+
+  # 📊 Dashboard - Aplicación Web (puerto 5005)
+  dashboard:
+    build: ./dashboard
+    container_name: dashboard
+    restart: always
+    ports:
+      - "5005:5000"
+    environment:
+      DB_HOST: warehouse
+      DB_PORT: 5432
+      DB_NAME: warehouse
+      DB_USER: warehouse
+      DB_PASSWORD: warehouse123
+    networks:
+      - datalake
+    depends_on:
+      warehouse:
+        condition: service_healthy
+      flask-api:
+        condition: service_healthy
+
+  # 🔧 pgAdmin - Administración
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
     volumes:
-      - ./superset_home:/app/superset_home
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - datalake
+    depends_on:
+      warehouse:
+        condition: service_healthy
 
 volumes:
-  nifi_database_repository:
-  nifi_flowfile_repository:
-  nifi_content_repository:
-  nifi_provenance_repository:
-  nifi_state:
-  nifi_logs:
+  warehouse_data:
+  pgadmin_data:
+
+networks:
+  datalake:
+    driver: bridge
+  
+  # 🌐 Red externa compartida con el frontend
+  drimsoft-network:
+    external: true
+    name: drimsoft-network
